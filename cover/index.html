@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Notion Cover Banner</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<style>
+  @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css');
+  @import url('https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@400;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    height: 100%;
+    font-family: "Pretendard Variable", Pretendard, -apple-system, sans-serif;
+    overflow: hidden;
+  }
+
+  .stage {
+    position: relative;
+    width: 100%;
+    height: 100vh;
+    min-height: 160px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    padding: clamp(20px, 4vh, 36px) clamp(28px, 5vw, 64px);
+    color: var(--ink);
+    background: var(--bg);
+    transition: background 1.4s ease, color 1.4s ease;
+    overflow: hidden;
+  }
+
+  /* 시간대에 따라 흐르는 은은한 빛 — 가로 배너에 맞춰 옆으로 길게 */
+  .aurora {
+    position: absolute;
+    width: 55%;
+    height: 220%;
+    border-radius: 50%;
+    filter: blur(80px);
+    opacity: 0.5;
+    background: var(--glow);
+    top: -60%;
+    right: -8%;
+    transition: background 1.4s ease;
+    will-change: transform;
+    pointer-events: none;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .aurora { animation: drift 20s ease-in-out infinite alternate; }
+  }
+  @keyframes drift {
+    from { transform: translate(0, 0) scale(1); }
+    to   { transform: translate(-10%, 8%) scale(1.12); }
+  }
+
+  .left, .right { position: relative; z-index: 1; }
+
+  .greeting {
+    font-size: clamp(13px, 1.6vw, 17px);
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    opacity: 0.78;
+    margin-bottom: 4px;
+  }
+
+  .clock {
+    font-size: clamp(40px, 8vw, 78px);
+    font-weight: 300;
+    letter-spacing: -0.03em;
+    line-height: 0.95;
+    font-variant-numeric: tabular-nums;
+    display: flex;
+    align-items: baseline;
+    gap: 9px;
+  }
+  .clock .ampm {
+    font-size: clamp(13px, 1.9vw, 20px);
+    font-weight: 500;
+    opacity: 0.6;
+  }
+  .clock .sec {
+    font-size: clamp(14px, 2.2vw, 22px);
+    font-weight: 400;
+    opacity: 0.5;
+  }
+
+  .right {
+    text-align: right;
+    max-width: 58%;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 12px;
+  }
+  .date {
+    font-size: clamp(13px, 1.7vw, 17px);
+    font-weight: 600;
+    opacity: 0.75;
+  }
+  .quote {
+    font-family: "Nanum Myeongjo", serif;
+    font-size: clamp(13px, 1.6vw, 17px);
+    line-height: 1.5;
+    opacity: 0;
+    transition: opacity 0.9s ease;
+    white-space: nowrap;        /* 항상 한 줄 */
+  }
+  .quote.show { opacity: 0.8; }
+
+  /* 좁은 폭(모바일·작은 임베드)에서는 세로로 쌓고 중앙 정렬 */
+  @media (max-width: 560px) {
+    .stage { flex-direction: column; align-items: flex-start; justify-content: center; gap: 12px; }
+    .right { text-align: left; max-width: 100%; align-items: flex-start; }
+    .aurora { width: 90%; top: -40%; }
+  }
+
+  /* ── 시간대별 팔레트 ── */
+  .stage[data-period="dawn"]    { --bg:#f3e7ee; --ink:#5b3a52; --glow:#f6c7c0; }
+  .stage[data-period="morning"] { --bg:#fbf3df; --ink:#6b4e1f; --glow:#ffd98a; }
+  .stage[data-period="day"]     { --bg:#e7f1f6; --ink:#234a5e; --glow:#a9d8ec; }
+  .stage[data-period="evening"] { --bg:#f7e6dd; --ink:#6e3a2a; --glow:#f4a98a; }
+  .stage[data-period="night"]   { --bg:#1f2240; --ink:#dfe1f5; --glow:#5a4b9e; }
+</style>
+</head>
+<body>
+  <div class="stage" id="stage">
+    <div class="aurora"></div>
+
+    <div class="left">
+      <div class="greeting" id="greeting"></div>
+      <div class="clock">
+        <span id="time">--:--</span>
+        <span class="ampm" id="ampm"></span>
+        <span class="sec" id="sec"></span>
+      </div>
+    </div>
+
+    <div class="right">
+      <div class="date" id="date"></div>
+      <div class="quote" id="quote"></div>
+    </div>
+  </div>
+
+<script>
+  // ── 원하면 이름을 넣으세요 (예: "지수") ──
+  const USER_NAME = "";
+
+  // ── 8초마다 바뀌는 문구 (자유롭게 수정/추가) ──
+  const PHRASES = [
+    "오늘 할 일 중 가장 작은 것부터 시작해요.",
+    "완벽하지 않아도 괜찮아요. 일단 한 줄.",
+    "지금 이 순간도 차곡차곡 쌓이고 있어요.",
+    "급하게 말고, 꾸준하게.",
+    "어제보다 한 걸음이면 충분해요.",
+    "잘하고 있어요. 잠깐 숨 한 번 쉬고.",
+  ];
+
+  const stage = document.getElementById("stage");
+  const elTime = document.getElementById("time");
+  const elSec = document.getElementById("sec");
+  const elAmpm = document.getElementById("ampm");
+  const elDate = document.getElementById("date");
+  const elGreeting = document.getElementById("greeting");
+  const elQuote = document.getElementById("quote");
+
+  const DAYS = ["일", "월", "화", "수", "목", "금", "토"];
+  const pad = (n) => String(n).padStart(2, "0");
+
+  function periodOf(h) {
+    if (h >= 5 && h < 8)  return ["dawn", "동이 트고 있어요"];
+    if (h >= 8 && h < 12) return ["morning", "좋은 아침이에요"];
+    if (h >= 12 && h < 17) return ["day", "좋은 오후예요"];
+    if (h >= 17 && h < 20) return ["evening", "노을이 지는 시간이에요"];
+    return ["night", "고요한 밤이에요"];
+  }
+
+  function tick() {
+    const now = new Date();
+    const h = now.getHours(), m = now.getMinutes(), s = now.getSeconds();
+    const h12 = h % 12 === 0 ? 12 : h % 12;
+
+    elTime.textContent = `${pad(h12)}:${pad(m)}`;
+    elAmpm.textContent = h < 12 ? "AM" : "PM";
+    elSec.textContent = pad(s);
+    elDate.textContent =
+      `${now.getFullYear()}년 ${now.getMonth() + 1}월 ${now.getDate()}일 ${DAYS[now.getDay()]}요일`;
+
+    const [period, hello] = periodOf(h);
+    stage.dataset.period = period;
+    elGreeting.textContent = (USER_NAME ? `${USER_NAME}님, ` : "") + hello;
+  }
+
+  let qi = -1;
+  function rotateQuote() {
+    elQuote.classList.remove("show");
+    setTimeout(() => {
+      qi = (qi + 1) % PHRASES.length;
+      elQuote.textContent = PHRASES[qi];
+      elQuote.classList.add("show");
+    }, 600);
+  }
+
+  tick();
+  rotateQuote();
+  setInterval(tick, 1000);
+  setInterval(rotateQuote, 8000);
+</script>
+</body>
+</html>
